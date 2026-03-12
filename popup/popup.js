@@ -29,8 +29,13 @@ const $ = (id) => document.getElementById(id);
 const syncStatus        = $('sync-status');
 const bannerStale       = $('banner-stale');
 const bannerNotLoggedIn = $('banner-not-logged-in');
+const bannerFetching    = $('banner-fetching');
 const emptyState        = $('empty-state');
 const mainContent       = $('main-content');
+
+const accountName = $('account-name');
+const btnLogin    = $('btn-login');
+const btnSync     = $('btn-sync');
 
 const filterStatus  = $('filter-status');
 const filterSection = $('filter-section');
@@ -45,14 +50,14 @@ const btnGo              = $('btn-go');
 const btnReroll          = $('btn-reroll');
 const noMatch            = $('no-match');
 
-const modeCountdown  = $('mode-countdown');
-const modeStopwatch  = $('mode-stopwatch');
-const timerLimitRow  = $('timer-limit-row');
+const modeCountdown   = $('mode-countdown');
+const modeStopwatch   = $('mode-stopwatch');
+const timerLimitRow   = $('timer-limit-row');
 const timerLimitInput = $('timer-limit');
-const timerDisplay   = $('timer-display');
-const btnTimerStart  = $('btn-timer-start');
-const btnTimerPause  = $('btn-timer-pause');
-const btnTimerReset  = $('btn-timer-reset');
+const timerDisplay    = $('timer-display');
+const btnTimerStart   = $('btn-timer-start');
+const btnTimerPause   = $('btn-timer-pause');
+const btnTimerReset   = $('btn-timer-reset');
 
 // ─── Utility ──────────────────────────────────────────────────────────────────
 
@@ -181,17 +186,26 @@ function populateSections(problems) {
   }
 }
 
-// ─── Data loading ─────────────────────────────────────────────────────────────
+// ─── Account UI ───────────────────────────────────────────────────────────────
 
-async function tryInjectContentScript() {
-  const tabs = await chrome.tabs.query({ url: 'https://cses.fi/problemset/*' });
-  if (tabs.length > 0) {
-    await chrome.scripting.executeScript({
-      target: { tabId: tabs[0].id },
-      files: ['content.js']
-    });
+function updateAccountUI(username) {
+  if (username) {
+    accountName.textContent = username;
+    accountName.classList.remove('hidden');
+    btnLogin.classList.add('hidden');
+    btnSync.classList.remove('hidden');
+  } else {
+    accountName.classList.add('hidden');
+    btnLogin.classList.remove('hidden');
+    btnSync.classList.add('hidden');
   }
 }
+
+function setFetching(active) {
+  bannerFetching.classList.toggle('hidden', !active);
+}
+
+// ─── Data loading ─────────────────────────────────────────────────────────────
 
 async function loadData() {
   const result = await chrome.storage.local.get('csesData');
@@ -201,15 +215,18 @@ async function loadData() {
   if (!data || !data.problems || data.problems.length === 0) {
     emptyState.classList.remove('hidden');
     mainContent.classList.add('hidden');
-    await tryInjectContentScript();
+    updateAccountUI('');
     return;
   }
 
+  setFetching(false);
   emptyState.classList.add('hidden');
   mainContent.classList.remove('hidden');
 
   allProblems = data.problems;
   syncStatus.textContent = `Last synced: ${timeAgo(data.lastUpdated)}`;
+
+  updateAccountUI(data.username || '');
 
   const stale = Date.now() - data.lastUpdated > 24 * 60 * 60 * 1000;
   bannerStale.classList.toggle('hidden', !stale);
@@ -220,6 +237,11 @@ async function loadData() {
 
   populateSections(allProblems);
   rebuildPool();
+}
+
+function requestSync() {
+  setFetching(true);
+  chrome.runtime.sendMessage({ type: 'FETCH_DATA' });
 }
 
 // ─── Timer ────────────────────────────────────────────────────────────────────
@@ -337,9 +359,17 @@ function resetTimer() {
 
 // ─── Event listeners ──────────────────────────────────────────────────────────
 
-$('btn-open-cses').addEventListener('click', () => {
-  chrome.tabs.create({ url: 'https://cses.fi/problemset/list/' });
+btnLogin.addEventListener('click', () => {
+  chrome.runtime.sendMessage({ type: 'OPEN_LOGIN' });
 });
+
+$('btn-login-empty').addEventListener('click', () => {
+  chrome.runtime.sendMessage({ type: 'OPEN_LOGIN' });
+});
+
+btnSync.addEventListener('click', requestSync);
+
+$('btn-sync-empty').addEventListener('click', requestSync);
 
 btnRoll.addEventListener('click', rollProblem);
 btnReroll.addEventListener('click', rollProblem);
@@ -378,10 +408,12 @@ btnTimerStart.addEventListener('click', startTimer);
 btnTimerPause.addEventListener('click', pauseTimer);
 btnTimerReset.addEventListener('click', resetTimer);
 
-// Listen for content.js updates while popup is open
+// Listen for background messages
 chrome.runtime.onMessage.addListener((msg) => {
   if (msg.type === 'DATA_UPDATED') {
     loadData();
+  } else if (msg.type === 'LOGIN_SUCCESS') {
+    setFetching(true);
   }
 });
 
