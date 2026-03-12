@@ -1,10 +1,19 @@
-import { useState, useCallback, useRef } from 'react';
-import type { Problem } from '../types';
+import { useCallback, useEffect, useRef } from 'react';
+import { useStorage } from '../hooks/useStorage';
+import type { Problem, RandomPickerState } from '../types';
 
 interface Props {
   problems: Problem[];
   sections: string[];
 }
+
+const DEFAULT_PICKER_STATE: RandomPickerState = {
+  statusFilter: 'any',
+  sectionFilter: 'all',
+  currentProblem: null,
+  pool: [],
+  noMatch: false,
+};
 
 const STATUS_LABELS: Record<string, string> = {
   full: 'Solved',
@@ -34,39 +43,104 @@ function getFiltered(problems: Problem[], status: string, section: string): Prob
   });
 }
 
+function sanitizeProblem(problem: Problem | null, validProblems: Map<string, Problem>): Problem | null {
+  if (!problem) return null;
+  return validProblems.get(problem.id) ?? null;
+}
+
+function sanitizePool(pool: Problem[], validProblems: Map<string, Problem>): Problem[] {
+  return pool
+    .map((problem) => validProblems.get(problem.id))
+    .filter((problem): problem is Problem => problem !== undefined);
+}
+
 export default function RandomPicker({ problems, sections }: Props) {
-  const [statusFilter, setStatusFilter] = useState('any');
-  const [sectionFilter, setSectionFilter] = useState('all');
-  const [currentProblem, setCurrentProblem] = useState<Problem | null>(null);
-  const [noMatch, setNoMatch] = useState(false);
-  const poolRef = useRef<Problem[]>([]);
+  const [pickerState, setPickerState] = useStorage<RandomPickerState>(
+    'csesRandomPickerState',
+    DEFAULT_PICKER_STATE,
+  );
+  const poolRef = useRef<Problem[]>(pickerState.pool);
+  const { statusFilter, sectionFilter, currentProblem, noMatch } = pickerState;
+
+  useEffect(() => {
+    poolRef.current = pickerState.pool;
+  }, [pickerState.pool]);
+
+  useEffect(() => {
+    const validProblems = new Map(problems.map((problem) => [problem.id, problem]));
+    const nextSection =
+      pickerState.sectionFilter === 'all' || sections.includes(pickerState.sectionFilter)
+        ? pickerState.sectionFilter
+        : 'all';
+    const nextCurrentProblem = sanitizeProblem(pickerState.currentProblem, validProblems);
+    const nextPool = sanitizePool(pickerState.pool, validProblems);
+    const hasChanges =
+      nextSection !== pickerState.sectionFilter ||
+      nextCurrentProblem !== pickerState.currentProblem ||
+      nextPool.length !== pickerState.pool.length;
+
+    if (!hasChanges) {
+      return;
+    }
+
+    poolRef.current = nextPool;
+    setPickerState({
+      ...pickerState,
+      sectionFilter: nextSection,
+      currentProblem: nextCurrentProblem,
+      pool: nextPool,
+      noMatch: pickerState.noMatch && nextCurrentProblem === null && nextPool.length === 0,
+    });
+  }, [pickerState, problems, sections, setPickerState]);
 
   const roll = useCallback(() => {
-    if (poolRef.current.length === 0) {
-      const filtered = getFiltered(problems, statusFilter, sectionFilter);
+    let nextPool = poolRef.current;
+    if (nextPool.length === 0) {
+      const filtered = getFiltered(problems, pickerState.statusFilter, pickerState.sectionFilter);
       if (filtered.length === 0) {
-        setCurrentProblem(null);
-        setNoMatch(true);
+        poolRef.current = [];
+        setPickerState({
+          ...pickerState,
+          currentProblem: null,
+          pool: [],
+          noMatch: true,
+        });
         return;
       }
-      poolRef.current = shuffle(filtered);
+      nextPool = shuffle(filtered);
     }
-    setNoMatch(false);
-    setCurrentProblem(poolRef.current.pop()!);
-  }, [problems, statusFilter, sectionFilter]);
+
+    const selectedProblem = nextPool[nextPool.length - 1];
+    const remainingPool = nextPool.slice(0, -1);
+    poolRef.current = remainingPool;
+    setPickerState({
+      ...pickerState,
+      currentProblem: selectedProblem,
+      pool: remainingPool,
+      noMatch: false,
+    });
+  }, [pickerState, problems, setPickerState]);
 
   const handleStatusChange = (val: string) => {
-    setStatusFilter(val);
     poolRef.current = [];
-    setCurrentProblem(null);
-    setNoMatch(false);
+    setPickerState({
+      statusFilter: val as RandomPickerState['statusFilter'],
+      sectionFilter,
+      currentProblem: null,
+      pool: [],
+      noMatch: false,
+    });
   };
 
   const handleSectionChange = (val: string) => {
-    setSectionFilter(val);
     poolRef.current = [];
-    setCurrentProblem(null);
-    setNoMatch(false);
+    setPickerState({
+      statusFilter,
+      sectionFilter: val,
+      currentProblem: null,
+      pool: [],
+      noMatch: false,
+    });
   };
 
   return (
@@ -90,26 +164,34 @@ export default function RandomPicker({ problems, sections }: Props) {
           ))}
         </select>
       </div>
-      <div className="filter-actions">
-        <button className="btn btn-primary" onClick={roll}>Roll</button>
-      </div>
+      {!currentProblem && (
+        <div className="filter-actions">
+          <button className="btn btn-primary" onClick={roll}>Roll</button>
+        </div>
+      )}
 
       {currentProblem && (
         <div className="problem-card">
-          <div className="problem-name">{currentProblem.name}</div>
+          <a
+            className="problem-card-link"
+            href={`https://cses.fi/problemset/task/${currentProblem.id}`}
+            target="_self"
+          >
+            <div className="problem-name">{currentProblem.name}</div>
+          </a>
           <div className="problem-meta">{currentProblem.section} &middot; #{currentProblem.id}</div>
           <div className={`status-badge status-${currentProblem.status}`}>
             {STATUS_LABELS[currentProblem.status] || 'Unknown'}
           </div>
           <div className="problem-actions">
             <a
-              className="btn btn-primary"
+              className="btn btn-primary btn-solve"
               href={`https://cses.fi/problemset/task/${currentProblem.id}`}
               target="_self"
             >
-              Go
+              Solve →
             </a>
-            <button className="btn btn-secondary" onClick={roll}>Re-roll</button>
+            <button className="btn btn-ghost" onClick={roll}>Re-roll</button>
           </div>
         </div>
       )}

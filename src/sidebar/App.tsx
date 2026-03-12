@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useEffect } from 'react';
 import { useStorage } from './hooks/useStorage';
 import ToggleButton from './components/ToggleButton';
 import Sidebar from './components/Sidebar';
@@ -6,16 +6,16 @@ import Sidebar from './components/Sidebar';
 export default function App() {
   const [isOpen, setIsOpen] = useStorage('csesSidebarOpen', false);
 
-  const toggle = useCallback(() => {
-    const next = !isOpen;
-    setIsOpen(next);
-    // Shift page content
-    document.documentElement.style.marginRight = next ? '320px' : '';
-  }, [isOpen, setIsOpen]);
+  useEffect(() => {
+    document.documentElement.style.marginRight = '';
+    return () => {
+      document.documentElement.style.marginRight = '';
+    };
+  }, []);
 
   return (
     <>
-      <ToggleButton isOpen={isOpen} onClick={toggle} />
+      <ToggleButton isOpen={isOpen} onClick={() => setIsOpen(!isOpen)} />
       {isOpen && <Sidebar />}
     </>
   );

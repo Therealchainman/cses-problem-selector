@@ -13,6 +13,14 @@ export interface CsesData {
   username: string;
 }
 
+export interface RandomPickerState {
+  statusFilter: 'any' | 'unsolved' | 'solved' | 'partial';
+  sectionFilter: string;
+  currentProblem: Problem | null;
+  pool: Problem[];
+  noMatch: boolean;
+}
+
 export interface Submission {
   problemId: string;
   problemName: string;

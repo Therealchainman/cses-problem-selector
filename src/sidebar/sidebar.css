@@ -188,7 +188,6 @@
   font-size: 14px;
   font-weight: 600;
   color: #1a1a1a;
-  margin-bottom: 4px;
   line-height: 1.3;
 }
 
@@ -217,9 +216,21 @@
 .status-zero { color: #f44336; }
 .status-none { color: #9e9e9e; }
 
+.problem-card-link {
+  text-decoration: none;
+  display: block;
+  margin-bottom: 4px;
+}
+
+.problem-card-link:hover .problem-name {
+  color: #1565c0;
+  text-decoration: underline;
+}
+
 .problem-actions {
   display: flex;
   gap: 8px;
+  align-items: center;
 }
 
 .no-match {
@@ -252,13 +263,31 @@
   background: #0d47a1;
 }
 
-.btn-secondary {
-  background: #e0e0e0;
-  color: #333;
+.btn-solve {
+  flex: 1;
+  justify-content: center;
+  padding: 8px 14px;
+  font-size: 13px;
 }
 
-.btn-secondary:hover {
-  background: #bdbdbd;
+.btn-ghost {
+  background: transparent;
+  color: #555;
+  border: 1px solid #bdbdbd;
+  padding: 7px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+
+.btn-ghost:hover {
+  background: #f5f5f5;
+  border-color: #9e9e9e;
 }
 
 /* Stats */

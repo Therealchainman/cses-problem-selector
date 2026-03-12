@@ -4,8 +4,8 @@ import { setupSubmissionDetector } from './submissionDetector';
 import App from '../sidebar/App';
 import sidebarCSS from '../sidebar/sidebar.css?inline';
 
-// Parse problem data on the list page
-const isListPage = /\/problemset\/list/.test(window.location.pathname);
+// Parse problem data on the problem list routes.
+const isListPage = /^\/problemset(?:\/list)?\/?$/.test(window.location.pathname);
 const isTaskPage = /\/problemset\/task\/\d+/.test(window.location.pathname);
 
 if (isListPage) {
