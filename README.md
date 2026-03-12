@@ -16,6 +16,8 @@ A Chrome extension built with React and TypeScript that adds a sidebar to [CSES]
 npm install
 ```
 
+If dependencies change, rerun `npm install` before using the scripts below.
+
 ### 2. Build the extension
 
 For development (rebuilds automatically on file changes):
