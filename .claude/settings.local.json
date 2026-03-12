@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:cses.fi)",
+      "Bash(curl -s \"https://cses.fi/problemset/list/\" 2>&1 | head -200)",
+      "Bash(curl -s \"https://cses.fi/problemset/\" 2>&1 | head -300)",
+      "Bash(curl -s \"https://cses.fi/problemset/list/\" 2>&1 | grep -o 'class=\"[^\"]*\"' | sort | uniq)",
+      "Bash(curl -s \"https://cses.fi/problemset/list/\" 2>&1 | grep -o '<li class=\"task\".*</li>' | head -3)",
+      "Bash(curl -s \"https://cses.fi/problemset/list/\" 2>&1 | grep -E '<li class=\"task\"' | head -5)",
+      "Bash(curl -s \"https://cses.fi/problemset/list/\" 2>&1 | grep -o 'data-[^\"]*' | sort | uniq)",
+      "Bash(curl -s \"https://cses.fi/problemset/list/\" 2>&1 | sed -n '/Introductory Problems/,/Sorting and Searching/p' | head -100)",
+      "Bash(curl -s \"https://cses.fi/problemset/list/\" 2>&1 | grep -oP '<span class=\"task-score[^>]*>[^<]*</span>' | head -20)",
+      "Bash(curl -s \"https://cses.fi/problemset/list/\" 2>&1 | python3 -c \"\nimport re, sys\ncontent = sys.stdin.read\\(\\)\n# Find all task-score spans with their complete attributes\nmatches = re.findall\\(r'<span class=\\\\\"task-score[^>]*>', content\\)\nfor m in sorted\\(set\\(matches\\)\\):\n    print\\(m\\)\n\")",
+      "Bash(curl -s \"https://cses.fi/problemset/list/\" 2>&1 | grep -i \"full\\\\|zero\\\\|partial\" | head -20)",
+      "Bash(curl -s \"https://cses.fi/ui.js\" 2>&1 | head -100)",
+      "Bash(curl -s \"https://cses.fi/cses.css\" 2>&1 | grep -E \"\\\\.full|\\\\.zero|\\\\.partial|task-score\" | head -30)"
+    ]
+  }
+}
