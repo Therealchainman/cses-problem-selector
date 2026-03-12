@@ -15,42 +15,72 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 // ─── Login flow ───────────────────────────────────────────────────────────────
 
 let loginTabId = null;
+let fetchTabId = null;
 
 chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
-  if (tabId !== loginTabId || !changeInfo.url) return;
-
-  const url = changeInfo.url;
-  // Login succeeded when we leave the login page and land somewhere on cses.fi
-  if (!url.includes('/login') && url.startsWith('https://cses.fi/')) {
-    loginTabId = null;
-    chrome.tabs.remove(tabId);
-    openDataFetchTab();
-    broadcastToPopup({ type: 'LOGIN_SUCCESS' });
+  // ── Login tab monitoring ──────────────────────────────────────────────────
+  if (tabId === loginTabId && changeInfo.url) {
+    // Leave login page = successful login
+    if (!changeInfo.url.includes('/login') && changeInfo.url.startsWith('https://cses.fi/')) {
+      loginTabId = null;
+      chrome.tabs.remove(tabId);
+      openDataFetchTab();
+      broadcastToPopup({ type: 'LOGIN_SUCCESS' });
+    }
+    return;
   }
+
+  // ── Fetch tab monitoring ──────────────────────────────────────────────────
+  if (tabId === fetchTabId && changeInfo.status === 'complete') {
+    chrome.tabs.get(tabId, (t) => {
+      if (chrome.runtime.lastError || !t) return;
+
+      if (t.url && t.url.match(/https:\/\/cses\.fi\/problemset\/list/)) {
+        // Page loaded correctly — content.js auto-runs via manifest, but inject
+        // explicitly too in case it was blocked or the tab loaded unusually.
+        chrome.scripting.executeScript({
+          target: { tabId },
+          files: ['content.js']
+        }).catch(() => {
+          // If injection fails (e.g. page is a PDF or system page), give up.
+          chrome.tabs.remove(tabId);
+          fetchTabId = null;
+          broadcastToPopup({ type: 'FETCH_FAILED' });
+        });
+      } else {
+        // Redirected (likely to login page) — not logged in.
+        chrome.tabs.remove(tabId);
+        fetchTabId = null;
+        broadcastToPopup({ type: 'FETCH_FAILED' });
+      }
+    });
+  }
+});
+
+// Clean up if user manually closes either tracked tab.
+chrome.tabs.onRemoved.addListener((tabId) => {
+  if (tabId === fetchTabId)  fetchTabId  = null;
+  if (tabId === loginTabId)  loginTabId  = null;
 });
 
 // ─── Data fetch via temporary tab ─────────────────────────────────────────────
 
-let fetchTabId = null;
-
 function openDataFetchTab() {
-  if (fetchTabId != null) return; // Already fetching
+  if (fetchTabId != null) return; // already in progress
   chrome.tabs.create({ url: 'https://cses.fi/problemset/list', active: false }, (tab) => {
     fetchTabId = tab.id;
   });
 }
 
-// When the temp fetch tab's content script sends DATA_UPDATED, close the tab
-chrome.runtime.onMessage.addListener((msg, sender) => {
-  if (msg.type === 'DATA_UPDATED' && sender.tab && sender.tab.id === fetchTabId) {
-    chrome.tabs.remove(fetchTabId);
-    fetchTabId = null;
-    broadcastToPopup({ type: 'DATA_UPDATED' });
-    return;
-  }
+// ─── Message routing ──────────────────────────────────────────────────────────
 
-  // DATA_UPDATED from the real list page (user browsed there manually)
+chrome.runtime.onMessage.addListener((msg, sender) => {
   if (msg.type === 'DATA_UPDATED') {
+    // Close the temp fetch tab if this is the source.
+    if (sender.tab && sender.tab.id === fetchTabId) {
+      chrome.tabs.remove(fetchTabId);
+      fetchTabId = null;
+    }
     broadcastToPopup({ type: 'DATA_UPDATED' });
     return;
   }

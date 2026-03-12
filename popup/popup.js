@@ -209,6 +209,7 @@ function setFetching(active) {
 
 async function loadData() {
   const result = await chrome.storage.local.get('csesData');
+  setFetching(false);
   /** @type {StoredData|undefined} */
   const data = result.csesData;
 
@@ -218,8 +219,6 @@ async function loadData() {
     updateAccountUI('');
     return;
   }
-
-  setFetching(false);
   emptyState.classList.add('hidden');
   mainContent.classList.remove('hidden');
 
@@ -414,6 +413,8 @@ chrome.runtime.onMessage.addListener((msg) => {
     loadData();
   } else if (msg.type === 'LOGIN_SUCCESS') {
     setFetching(true);
+  } else if (msg.type === 'FETCH_FAILED') {
+    setFetching(false);
   }
 });
 
